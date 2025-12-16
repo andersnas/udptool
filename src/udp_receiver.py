@@ -37,13 +37,18 @@ def update_stats_for_port(port, payload_len, seq):
     now = time.time()
     s = stats[port]
 
-    # Initialize timing on first packet for this port
+    # First packet on this port: initialize without counting loss
     if s["start_time"] is None:
         s["start_time"] = now
         s["last_report"] = now
         s["last_bytes"] = 0
+        s["expected_seq"] = seq + 1  # start from the next expected seq
+        s["received"] = 1
+        s["bytes"] = payload_len
+        # s["lost"] stays 0
+        return
 
-    # Loss accounting (per port, independent seq stream)
+    # Subsequent packets: normal loss accounting
     if seq > s["expected_seq"]:
         s["lost"] += (seq - s["expected_seq"])
         s["expected_seq"] = seq + 1
@@ -55,6 +60,7 @@ def update_stats_for_port(port, payload_len, seq):
 
     s["received"] += 1
     s["bytes"] += payload_len
+
 
 
 def maybe_print_stats():
