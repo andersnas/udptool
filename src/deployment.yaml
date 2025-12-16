@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-receiver
+  labels:
+    app: udp-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udp-receiver
+  template:
+    metadata:
+      labels:
+        app: udp-receiver
+    spec:
+      containers:
+        - name: udp-receiver
+          image: "docker.io/andersnas/udp-receiver:latest"
+          imagePullPolicy: Always
+          env:
+            - name: BASE_PORT
+              value: "5005"   # will listen on 5005..5008
+          ports:
+            - containerPort: 5005
+              protocol: UDP
+            - containerPort: 5006
+              protocol: UDP
+            - containerPort: 5007
+              protocol: UDP
+            - containerPort: 5008
+              protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-receiver
+spec:
+  selector:
+    app: udp-receiver
+  type: LoadBalancer
+  ports:
+    - name: udp-0
+      port: 5005
+      targetPort: 5005
+      protocol: UDP
+    - name: udp-1
+      port: 5006
+      targetPort: 5006
+      protocol: UDP
+    - name: udp-2
+      port: 5007
+      targetPort: 5007
+      protocol: UDP
+    - name: udp-3
+      port: 5008
+      targetPort: 5008
+      protocol: UDP
