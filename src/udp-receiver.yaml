@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: udp-receiver
+  labels:
+    app: udp-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: udp-receiver
+  template:
+    metadata:
+      labels:
+        app: udp-receiver
+    spec:
+      containers:
+        - name: udp-receiver
+          image: your-dockerhub-user/udp-receiver:latest   # <-- change this
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5005
+              protocol: UDP
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "1"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: udp-receiver
+spec:
+  selector:
+    app: udp-receiver
+  type: NodePort        # or LoadBalancer if your cluster supports UDP LBs
+  ports:
+    - name: udp
+      port: 5005        # Cluster IP port
+      targetPort: 5005  # Container port
+      protocol: UDP
+      nodePort: 30005   # optional; omit to let k8s choose
