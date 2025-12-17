@@ -13,7 +13,7 @@ PORT = int(sys.argv[2])
 DURATION = float(sys.argv[3])
 RATE_MBIT = float(sys.argv[4])
 
-PAYLOAD_SIZE = 1400  # bytes total (including 8 bytes seq)
+PAYLOAD_SIZE = 500  # bytes total (including 8 bytes seq)
 SEQ_SIZE = 8
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

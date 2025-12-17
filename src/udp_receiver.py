@@ -28,6 +28,7 @@ for i in range(NUM_PORTS):
         "start_time": None,
         "last_report": None,
         "last_bytes": 0,
+        "line_position": i,  # track which line this port should update
     }
 
     print(f"Listening on {UDP_IP}:{port} (UDP only)")
@@ -63,14 +64,30 @@ def update_stats_for_port(port, payload_len, seq):
 
 
 
+def reset_port_stats(port):
+    """Reset all metrics for a port when throughput drops to 0."""
+    s = stats[port]
+    line_pos = s["line_position"]  # preserve line position
+    stats[port] = {
+        "expected_seq": 0,
+        "received": 0,
+        "lost": 0,
+        "bytes": 0,
+        "start_time": None,
+        "last_report": None,
+        "last_bytes": 0,
+        "line_position": line_pos,
+    }
+
+
 def maybe_print_stats():
     now = time.time()
-    lines = []
 
     for port, s in stats.items():
         if s["start_time"] is None:
             continue  # no traffic yet on this port
 
+        # Check if enough time has passed since last report
         if now - s["last_report"] < 1.0:
             continue  # print at most once a second per port
 
@@ -78,26 +95,55 @@ def maybe_print_stats():
         interval = now - s["last_report"]
         interval_bytes = s["bytes"] - s["last_bytes"]
 
-        avg_mbits = (s["bytes"] * 8) / (1e6 * elapsed_total) if elapsed_total > 0 else 0
         inst_mbits = (interval_bytes * 8) / (1e6 * interval) if interval > 0 else 0
+
+        # Reset all metrics when throughput drops to 0
+        if inst_mbits == 0 or interval_bytes == 0:
+            # Clear the line for this port
+            line_pos = s["line_position"]
+            lines_up = NUM_PORTS - line_pos
+            output = (
+                f"\033[{lines_up}A"  # Move cursor up to the port's line
+                f"\r"  # Move to beginning of line
+                f"\033[K"  # Clear the line
+                f"Port {port} | Waiting for traffic..."
+                f"\033[{lines_up}B"  # Move cursor back down
+            )
+            print(output, end='', flush=True)
+
+            reset_port_stats(port)
+            continue
 
         total_pkts = s["received"] + s["lost"]
         loss_pct = 100 * s["lost"] / total_pkts if total_pkts > 0 else 0.0
 
-        lines.append(
+        # Update the line in place using ANSI escape codes
+        line_pos = s["line_position"]
+        # Calculate how many lines to move up from current position
+        lines_up = NUM_PORTS - line_pos
+
+        output = (
+            f"\033[{lines_up}A"  # Move cursor up to the port's line
+            f"\r"  # Move to beginning of line
+            f"\033[K"  # Clear the line
             f"Port {port} | Time {elapsed_total:.1f}s "
             f"| rx_pkts={s['received']} lost_pkts={s['lost']} loss_pct={loss_pct:.3f}% "
-            f"| inst={inst_mbits:.2f} Mbit/s avg={avg_mbits:.2f} Mbit/s"
+            f"| inst={inst_mbits:.2f} Mbit/s"
+            f"\033[{lines_up}B"  # Move cursor back down
         )
+        print(output, end='', flush=True)
 
         s["last_report"] = now
         s["last_bytes"] = s["bytes"]
 
-    if lines:
-        print("\n".join(lines))
-
 
 def main():
+    # Initialize display with placeholder lines for each port
+    print()  # blank line
+    for i in range(NUM_PORTS):
+        port = BASE_PORT + i
+        print(f"Port {port} | Waiting for traffic...")
+
     while True:
         # wait for data or timeout every 1s to print stats
         readable, _, _ = select.select(sockets, [], [], 1.0)
